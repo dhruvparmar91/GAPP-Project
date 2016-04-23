@@ -1,0 +1,13 @@
+package gapp.model.dao;
+
+import gapp.model.Degree;
+
+public interface DegreeDao {
+	
+	public Degree saveDegree(Degree degree);
+	
+	public Degree getDegree(Integer id);
+	
+	public void removeDegree(Degree degree);
+
+}

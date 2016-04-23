@@ -1,0 +1,61 @@
+package gapp.model;
+
+import java.io.Serializable;
+
+import javax.persistence.Column;
+import javax.persistence.Embeddable;
+
+@Embeddable
+public class Degree implements Serializable {
+
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 1L;
+
+	private String name;
+
+	private String major;
+
+	private String school;
+
+	@Column(name = "time_period")
+	private Integer timePeriod;
+
+	public Degree() {
+
+	}
+
+	public String getName() {
+		return name;
+	}
+
+	public void setName(String name) {
+		this.name = name;
+	}
+
+	public String getMajor() {
+		return major;
+	}
+
+	public void setMajor(String major) {
+		this.major = major;
+	}
+
+	public String getSchool() {
+		return school;
+	}
+
+	public void setSchool(String school) {
+		this.school = school;
+	}
+
+	public Integer getTimePeriod() {
+		return timePeriod;
+	}
+
+	public void setTimePeriod(Integer timePeriod) {
+		this.timePeriod = timePeriod;
+	}
+
+}

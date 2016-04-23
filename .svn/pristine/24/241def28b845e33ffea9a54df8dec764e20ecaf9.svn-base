@@ -1,0 +1,326 @@
+package gapp.web.controller;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.List;
+
+import javax.servlet.ServletContext;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.propertyeditors.CustomDateEditor;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.ModelMap;
+import org.springframework.web.bind.WebDataBinder;
+import org.springframework.web.bind.annotation.InitBinder;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.SessionAttributes;
+import org.springframework.web.bind.support.SessionStatus;
+import org.springframework.web.multipart.MultipartFile;
+
+import gapp.model.AddField;
+import gapp.model.AddValue;
+import gapp.model.AppStatus;
+import gapp.model.Application;
+import gapp.model.Degree;
+import gapp.model.Department;
+import gapp.model.Program;
+import gapp.model.User;
+import gapp.model.dao.AppStatusDao;
+import gapp.model.dao.ApplicationDao;
+import gapp.model.dao.DegreeDao;
+import gapp.model.dao.DepartmentDao;
+import gapp.model.dao.ProgramDao;
+import gapp.model.dao.UserDao;
+
+@Controller
+@SessionAttributes("application")
+public class ApplicationController {
+
+	@Autowired
+	ApplicationDao applicationDao;
+
+	@Autowired
+	DepartmentDao departmentDao;
+
+	@Autowired
+	ProgramDao programDao;
+
+	@Autowired
+	UserDao userDao;
+
+	@Autowired
+	AppStatusDao appStatusDao;
+
+	@Autowired
+	DegreeDao degreeDao;
+	
+	@Autowired
+	ServletContext context;
+
+	@RequestMapping(value = "/user/student/{userid}/application/{appid}.html", method = RequestMethod.GET)
+	public String ViewApplication(@PathVariable Integer appid, ModelMap models) {
+
+		models.put("application", applicationDao.getApplication(appid));
+		return "user/student/ViewApplication";
+	}
+
+	@RequestMapping(value = "/user/student/{userid}/application/{appid}/submitApplication.html", method = RequestMethod.GET)
+	public String SubmitApplication(@PathVariable Integer userid, @PathVariable Integer appid, ModelMap models) {
+		Application application = applicationDao.getApplication(appid);
+		AppStatus appStatus = new AppStatus();
+		appStatus.setComment("Newly Submitted Application");
+		appStatus.setDate(new Date());
+		appStatus.setStatus("Submitted");
+		appStatus.setApplication(application);
+		appStatus = appStatusDao.saveStatus(appStatus);
+		return "redirect:/user/student/" + userid + "/studentPage.html";
+	}
+
+	@RequestMapping(value = "user/student/{userid}/addApplication.html", method = RequestMethod.GET)
+	public String AddApplication(@PathVariable Integer userid, ModelMap models) {
+		Application application = new Application();
+		models.put("application", application);
+		models.put("departments", departmentDao.getDepartments());
+		return "user/student/AddApplication";
+	}
+
+	@RequestMapping(value = "user/student/{userid}/addApplication.html", method = RequestMethod.POST)
+	public String AddApp(@ModelAttribute Application application, @PathVariable Integer userid, ModelMap models,
+			HttpServletRequest request) {
+		Application app = new Application();
+		User applicant = userDao.getUser(userid);
+		Department dept = departmentDao.getDepartment(application.getDepartment().getId());
+		Program prog = programDao.getProgram(application.getProgram().getId());
+
+		app.setApplicant(applicant);
+		app.setDepartment(dept);
+		app.setProgram(prog);
+		app.setTerm(application.getTerm());
+		Application appWithStatus = applicationDao.saveApplication(app);
+
+		AppStatus status = new AppStatus();
+		status.setComment("new saved application");
+		// status.setDate(new Date());
+		status.setStatus("Not Submitted");
+		status.setApplication(appWithStatus);
+		AppStatus savedStatus = appStatusDao.saveStatus(status);
+		System.out.println(savedStatus.getComment());
+
+		return "redirect:/user/student/" + userid + "/addApplication/" + appWithStatus.getId() + "/applicantInfo.html";
+
+	}
+
+	@RequestMapping(value = "user/student/{userid}/addApplication/{appid}/applicantInfo.html", method = RequestMethod.GET)
+	public String ApplicantInfo(@PathVariable Integer userid, @PathVariable Integer appid, ModelMap models) {
+		Application application = applicationDao.getApplication(appid);
+		// User user = userDao.getUser(userid);
+		// Application sticky = null;
+		// System.out.println(user.getApplications().size());
+		// if(user.getApplications() != null) {
+		// sticky = user.getApplications().get(0);
+		// } else {
+		// sticky = new Application();
+		// }
+		// models.put("sticky", sticky);
+		models.put("application", application);
+		return "user/student/AddApplicantInfo";
+	}
+
+	@RequestMapping(value = "user/student/{userid}/addApplication/{appid}/applicantInfo.html", method = RequestMethod.POST)
+	public String ApplicantInfo(@ModelAttribute Application application, @PathVariable Integer userid,
+			@PathVariable Integer appid, HttpServletRequest request) {
+		System.out.println("reached");
+		Application oldapp = applicationDao.getApplication(appid);
+		application.setId(oldapp.getId());
+		application.setApplicant(oldapp.getApplicant());
+		application.setDepartment(oldapp.getDepartment());
+		application.setProgram(oldapp.getProgram());
+		application.setTerm(oldapp.getTerm());
+		// File file = new File(transcript.getName());
+		// transcript.transferTo(file);
+		// application.setTranscript(file);
+		// application.setDateOfBirth(new
+		// Date(request.getParameter("dateOfBirth")));
+		application = applicationDao.saveApplication(application);
+		// System.out.println("phase 2 nearly complete");
+
+		// System.out.println(application.getDateOfBirth());
+		// models.put("application", application);
+		return "redirect:/user/student/" + userid + "/addApplication/" + application.getId() + "/transcript.html";
+	}
+
+	@RequestMapping(value = "user/student/{userid}/addApplication/{appid}/transcript.html", method = RequestMethod.GET)
+	public String UploadTranscript(@PathVariable Integer userid, @PathVariable Integer appid, ModelMap models) {
+
+		return "user/student/FileUpload";
+	}
+
+	@RequestMapping(value = "user/student/{userid}/addApplication/{appid}/transcript.html", method = RequestMethod.POST)
+	public String UploadTranscript(@PathVariable Integer userid, @PathVariable Integer appid,
+			@RequestParam MultipartFile transcript) throws IllegalStateException, IOException {
+		Application application = applicationDao.getApplication(appid);
+		
+		if (!transcript.isEmpty()) {
+	        try {
+	            File file = new File(transcript.getOriginalFilename());
+	            transcript.transferTo(file);
+	          application.setTranscript(file);
+	          application = applicationDao.saveApplication(application);
+
+	        } catch (IOException e) {
+	        	System.out.println(e);
+	        }
+	    }
+		return "redirect:/user/student/" + userid + "/addApplication/" + application.getId() + "/education.html";
+	}
+
+	@RequestMapping(value = "user/student/{userid}/addApplication/{appid}/education.html", method = RequestMethod.GET)
+	public String EducationInfo(@PathVariable Integer userid, @PathVariable Integer appid, ModelMap models) {
+		Application application = applicationDao.getApplication(appid);
+		List<Degree> degrees = application.getDegrees();
+		models.put("application", application);
+		models.put("degrees", degrees);
+		return "user/student/EducationInfo";
+	}
+
+	@RequestMapping(value = "user/student/{userid}/addApplication/{appid}/education.html", method = RequestMethod.POST)
+	public String SaveToReview(@PathVariable Integer userid, @PathVariable Integer appid, HttpServletRequest request) {
+		// if (request.getParameter("save") != null) {
+		// return "redirect:/user/student/" + userid + "/application/" + appid +
+		// ".html";
+		// } else {
+		return "redirect:/user/student/" + userid + "/addApplication/" + appid + "/additionalFields.html";
+
+		// }
+	}
+
+	@RequestMapping(value = "user/student/{userid}/addApplication/{appid}/additionalFields.html", method = RequestMethod.GET)
+	public String AdditionalFields(@PathVariable Integer userid, @PathVariable Integer appid, ModelMap models) {
+		Application app = applicationDao.getApplication(appid);
+		List<AddField> addFields = app.getDepartment().getAddFields();
+		List<AddValue> addValues = app.getAddValues();
+		for (int i = 0; i < addFields.size(); i++) {
+			AddValue addValue = new AddValue();
+			addValue.setAddField(addFields.get(i));
+			addValue.setApplication(app);
+			addValues.add(addValue);
+		}
+		app.setAddValues(addValues);
+		models.put("application", app);
+
+		return "user/student/addFields";
+	}
+
+	@RequestMapping(value = "user/student/{userid}/addApplication/{appid}/additionalFields.html", method = RequestMethod.POST)
+	public String AdditionalFields(@PathVariable Integer userid, @PathVariable Integer appid,
+			@ModelAttribute Application application, SessionStatus status) {
+		Application app = applicationDao.getApplication(appid);
+		app.setAddValues(application.getAddValues());
+		app = applicationDao.saveApplication(app);
+		status.setComplete();
+		return "redirect:/user/student/" + userid + "/application/" + appid + ".html";
+	}
+
+	@RequestMapping(value = "user/student/{userid}/addApplication/{appid}/addEducation.html", method = RequestMethod.GET)
+	public String addEducation(@PathVariable Integer userid, @PathVariable Integer appid, ModelMap models) {
+		Degree degree = new Degree();
+		models.put("degree", degree);
+		return "user/student/addEducation";
+	}
+
+	@RequestMapping(value = "user/student/{userid}/addApplication/{appid}/addEducation.html", method = RequestMethod.POST)
+	public String addEducation(@PathVariable Integer userid, @PathVariable Integer appid,
+			@ModelAttribute Degree degree) {
+		Application application = applicationDao.getApplication(appid);
+		degree.setApplication(application);
+		degree = degreeDao.saveDegree(degree);
+		// System.out.println(degree.getName());
+
+		return "redirect:education.html";
+	}
+
+	@RequestMapping(value = "user/student/{userid}/addApplication/{appid}/education/{educationid}/editEducation.html", method = RequestMethod.GET)
+	public String editEducation(@PathVariable Integer educationid, ModelMap models) {
+		Degree degree = degreeDao.getDegree(educationid);
+		models.put("degree", degree);
+		return "user/student/editEducation";
+	}
+
+	@RequestMapping(value = "user/student/{userid}/addApplication/{appid}/education/{educationid}/editEducation.html", method = RequestMethod.POST)
+	public String editEducation(@PathVariable Integer userid, @PathVariable Integer educationid,
+			@PathVariable Integer appid, @ModelAttribute Degree degree) {
+		Application application = applicationDao.getApplication(appid);
+		degree.setId(educationid);
+		degree.setApplication(application);
+		degree = degreeDao.saveDegree(degree);
+
+		return "redirect:/user/student/" + userid + "/addApplication/" + appid + "/education.html";
+	}
+
+	@RequestMapping(value = "user/student/{userid}/addApplication/{appid}/education/{educationid}/removeEducation.html", method = RequestMethod.GET)
+	public String removeEducation(@PathVariable Integer userid, @PathVariable Integer educationid,
+			@PathVariable Integer appid, @ModelAttribute Degree degree) {
+		degreeDao.removeDegree(degreeDao.getDegree(educationid));
+
+		return "redirect:/user/student/" + userid + "/addApplication/" + appid + "/education.html";
+	}
+
+	@RequestMapping(value = "user/student/{userid}/ajaxPrograms.html", method = RequestMethod.GET)
+	public String AjaxProg(@RequestParam(value = "id") String id, ModelMap models) {
+		// System.out.println(">>>>>>>>request received<<<<<<<<<<");
+		// System.out.println(Integer.parseInt(id));
+		Department department = departmentDao.getDepartment(Integer.parseInt(id));
+		// List<Program> list = new ArrayList<Program>();
+		// list = department.getPrograms();
+
+		models.put("programs", department.getPrograms());
+		// List<Program> programs = new ArrayList<Program>();
+		// for (int i = 0; i < department.getPrograms().size(); i++) {
+		// programs.add(department.getPrograms().get(i).getName());
+		// System.out.println(department.getPrograms().get(i).getName());
+		// }
+		// for (int i = 0; i < programs.size(); i++) {
+		// System.out.println(programs);
+		// }
+		// ObjectMapper objectMapper = new ObjectMapper();
+		// response.setContentType("application/json");
+		// objectMapper.writeValue(response.getWriter(), programs);
+
+		return "user/student/ajaxPrograms";
+	}
+
+	@RequestMapping(value = "/user/student/{userid}/application/{appid}/downloadTranscript.html", method = RequestMethod.GET)
+	public String ViewTranscript(@PathVariable Integer userid, @PathVariable Integer appid, HttpServletRequest request,
+			HttpServletResponse response) throws IOException {
+		
+		Application application = applicationDao.getApplication(appid);
+		File file = application.getTranscript();
+		response.setContentType("application/x-msdownload");
+		response.setHeader("Content-disposition", "attachment; filename="+ file.getName());
+
+		
+		FileInputStream in = new FileInputStream(file);
+		OutputStream out = response.getOutputStream();
+
+		byte buffer[] = new byte[2048];
+		int bytesRead;
+		while ((bytesRead = in.read(buffer)) > 0)
+			out.write(buffer, 0, bytesRead);
+
+		in.close();
+		response.flushBuffer();
+
+		return null;
+	}
+
+}
