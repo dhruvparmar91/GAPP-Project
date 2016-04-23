@@ -1,2 +1,0 @@
-drop table app_statuses, add_fields, application_degrees, applications, departments, programs, roles, users CASCADE;
-drop sequence hibernate_sequence;
